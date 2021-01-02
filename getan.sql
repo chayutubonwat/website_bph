@@ -1,0 +1,50 @@
+CREATE DEFINER=`hos`@`%` FUNCTION `get_newan`(param1 varchar(150)) RETURNS varchar(9) CHARSET tis620
+begin   declare an_style int;   
+declare newan varchar(9);   
+declare an_length int;   
+declare anserial_no  int;   
+declare an_count int;   
+declare anlock_count int;   
+declare check_an_skip varchar(1);   
+declare an_start int;   
+declare year_prefix char(2);   
+declare an_in_year_count int;   
+declare last_an_inyear varchar(9);   
+declare ancount1 int;   
+declare ancount2 int;   
+select sys_value into an_style from sys_var where sys_name = 'an_style';  
+select anstartnumber into an_start from opdconfig ;  select 9 into an_length ;   
+select sys_value into check_an_skip from sys_var where sys_name = 'USE_SKIP_AN';   
+delete from anlock where (unix_timestamp(now()) - unix_timestamp(lock_datetime) > (60*30)) or (lock_datetime is null) ; 
+select count(a1.an) into ancount2 from anlock a1,ipt a2 where a1.onlineid = param1 and a1.an = a2.an ;  
+select count(a1.an) into ancount1 from anlock a1 where a1.onlineid = param1 ;  
+if ancount1>0 THEN   if ancount2<ancount1 THEN       select an into newan from anlock where an not in (select a1.an from anlock a1,ipt a2 where a1.onlineid = param1 and a1.an = a2.an) and onlineid = param1  limit 1;       
+return newan;    
+end if;  end if;   
+select serial_no into anserial_no from serial where name = 'AN';   
+if check_an_skip = 'Y' then set anserial_no = anserial_no - 20;   end if;   
+if anserial_no < 1 then set anserial_no = 1;   end if;   if anserial_no < an_start then set anserial_no = an_start;   
+end if; 
+if an_style=1 then   set anlock_count = 0;   while anlock_count = 0 do   set an_count = 1 ;   while an_count>0 do      set anserial_no = anserial_no + 1;    
+set newan=concat(anserial_no);      while length(newan)< an_length do         set newan = concat('0',newan) ;     end while;    
+select count(an) into an_count from  ipt where an = newan;  if an_count = 0 THEN        select count(an) into an_count from  anlock where an = newan;   
+end if;   end while;  delete from anlock where onlineid = param1;  
+insert ignore into anlock (an,optype,onlineid,lock_datetime) values (newan,'Insert',param1,now()); 
+select count(an) into anlock_count from anlock where an = newan and onlineid = param1;   end while;   set anserial_no = newan;   
+update serial set serial_no = anserial_no where name = 'AN'; else  select substring(year(now())+543,3,2) into year_prefix; 
+select count(*) into an_in_year_count from ipt where substring(an,1,2) = year_prefix ;   if an_in_year_count = 0 
+then select concat(year_prefix,'0000001') into last_an_inyear;   else   select max(an)
+into last_an_inyear from ipt where  substring(an,1,2) = year_prefix ; 
+end if;   set anlock_count = 0;  
+while anlock_count = 0 do   set an_count = 1 ;   
+while an_count>0 do      set last_an_inyear = concat(last_an_inyear + 1);      set newan=concat(last_an_inyear);    
+while length(newan)< an_length do         set newan = concat('0',newan) ;     end while;     select count(an) into an_count from  ipt where an = newan;  if an_count = 0 THEN        select count(an) into an_count from  anlock where an = newan;    
+end if;   
+end while;  
+delete from anlock where onlineid = param1;   
+insert ignore into anlock (an,optype,onlineid,lock_datetime) values (newan,'Insert',param1,now());  
+select count(an) into anlock_count from anlock where an = newan and onlineid = param1;   
+end while;  
+end if;  
+return newan;  
+end
